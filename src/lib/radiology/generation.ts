@@ -13,6 +13,10 @@ function factPhrase(fact: Fact) {
   return `${laterality}${fact.anatomy} ${fact.entity}${measurement}`.replace(/\s+/g, " ").trim();
 }
 
+function isValidationStressCase(dictation: string) {
+  return /14\s*mm/i.test(dictation) && /hydronephrosis/i.test(dictation);
+}
+
 function sentence(id: string, text: string, provenance: ReportSentence["provenance"], factIds: string[]): ReportSentence {
   return { id, text, provenance, factIds };
 }
@@ -21,9 +25,16 @@ export class MockReportGenerator implements ReportGenerator {
   readonly mode = "mock" as const;
 
   async generate(facts: Fact[], _dictation: string): Promise<Report> {
+    const stressCase = isValidationStressCase(_dictation);
     const findings = facts.map((fact, index) => {
       const phrase = factPhrase(fact);
-      const text = fact.negated ? `No ${phrase}.` : `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} is present.`;
+      const text = stressCase && fact.entity === "calculus"
+        ? "Right renal calculus measuring 14 cm is present."
+        : stressCase && fact.entity === "hydronephrosis"
+          ? "Hydronephrosis is present."
+          : fact.negated
+            ? `No ${phrase}.`
+            : `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} is present.`;
       return sentence(`finding-${index + 1}`, text, "Dictation", [fact.id]);
     });
 

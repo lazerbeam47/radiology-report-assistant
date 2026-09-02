@@ -18,6 +18,8 @@ export function validateGrounding(facts: Fact[], report: Report): Warning[] {
         severity: "high",
         fix: `Remove unsupported diagnostic language: ${unsupported.join(", ")}.`,
         factIds: sentence.factIds,
+          sentenceId: sentence.id,
+          status: "open",
       });
     }
   }

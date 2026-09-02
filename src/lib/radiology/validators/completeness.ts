@@ -12,5 +12,7 @@ export function validateCompleteness(facts: Fact[], report: Report): Warning[] {
       severity: fact.severity === "critical" ? ("high" as const) : ("medium" as const),
       fix: `Add “${fact.entity}” to the impression.`,
       factIds: [fact.id],
+      sentenceId: null,
+      status: "open" as const,
     }));
 }
