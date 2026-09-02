@@ -18,6 +18,8 @@ export function validateLaterality(facts: Fact[], report: Report): Warning[] {
           severity: "high",
           fix: `Use “${fact.laterality}” everywhere this fact is referenced.`,
           factIds: [fact.id],
+          sentenceId: sentence.id,
+          status: "open",
         });
       }
     }

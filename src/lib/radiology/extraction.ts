@@ -1,6 +1,10 @@
 import type { Fact, Laterality } from "./types";
 
 const ENTITY_PATTERNS = [
+  { pattern: /post[- ]cholecystectomy|cholecystectomy/i, entity: "post-cholecystectomy status", anatomy: "gallbladder" },
+  { pattern: /biliary dilatation/i, entity: "biliary dilatation", anatomy: "biliary tree" },
+  { pattern: /midline shift/i, entity: "midline shift", anatomy: "midline" },
+  { pattern: /lesion/i, entity: "lesion", anatomy: "organ" },
   { pattern: /opacity/i, entity: "opacity", anatomy: "lower lobe" },
   { pattern: /aneurysm/i, entity: "aneurysm", anatomy: "MCA" },
   { pattern: /infarct/i, entity: "acute infarct", anatomy: "brain" },
@@ -8,6 +12,7 @@ const ENTITY_PATTERNS = [
   { pattern: /microvascular ischemic change/i, entity: "chronic microvascular ischemic change", anatomy: "brain" },
   { pattern: /calculus|stone/i, entity: "calculus", anatomy: "urinary tract" },
   { pattern: /hydroureteronephrosis/i, entity: "hydroureteronephrosis", anatomy: "ureter" },
+  { pattern: /hydronephrosis/i, entity: "hydronephrosis", anatomy: "kidneys" },
   { pattern: /pleural effusion/i, entity: "pleural effusion", anatomy: "pleural space" },
   { pattern: /pneumothorax/i, entity: "pneumothorax", anatomy: "pleural space" },
   { pattern: /appendix/i, entity: "appendix", anatomy: "appendix" },
@@ -60,12 +65,23 @@ export function extractFacts(dictation: string): Fact[] {
     const measurement = measurementMatch
       ? {
           value: Number(measurementMatch[1]),
+          values: measurementMatch[1].split(/\s*(?:x|×)\s*/i).map(Number),
           unit: measurementMatch[2].toLowerCase(),
           raw: measurementMatch[0],
         }
       : null;
 
-    const anatomy = /lower lobe/i.test(sentence) ? "right lower lobe" : /UVJ/i.test(sentence) ? "left UVJ" : definition.anatomy;
+     const anatomy = /basal ganglia/i.test(sentence)
+       ? "basal ganglia"
+       : /segment VI/i.test(sentence)
+         ? "segment VI"
+         : /renal/i.test(sentence) && definition.entity === "calculus"
+           ? "renal kidney"
+           : /lower lobe/i.test(sentence)
+             ? "right lower lobe"
+             : /UVJ/i.test(sentence)
+               ? "left UVJ"
+               : definition.anatomy;
     facts.push({
       id: `fact-${patternIndex + 1}`,
       entity: definition.entity,
@@ -73,7 +89,7 @@ export function extractFacts(dictation: string): Fact[] {
       laterality,
       measurement,
       negated,
-      severity: severityFor(definition.entity, negated),
+       severity: severityFor(definition.entity, negated),
       sourceQuote: sentence,
     });
   }

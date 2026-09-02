@@ -8,6 +8,7 @@ export type Laterality = z.infer<typeof LateralitySchema>;
 
 export const MeasurementSchema = z.object({
   value: z.number(),
+  values: z.array(z.number()).min(1),
   unit: z.string(),
   raw: z.string(),
 });
@@ -52,6 +53,8 @@ export const WarningSchema = z.object({
   severity: z.enum(["high", "medium", "low"]),
   fix: z.string(),
   factIds: z.array(z.string()),
+  sentenceId: z.string().nullable(),
+  status: z.enum(["open", "fixed", "dismissed"]),
 });
 export type Warning = z.infer<typeof WarningSchema>;
 

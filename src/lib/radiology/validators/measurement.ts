@@ -1,6 +1,6 @@
 import type { Fact, Report, Warning } from "../types";
 
-const measurementPattern = /(\d+(?:\.\d+)?)\s*(mm|cm|mL|ml|%)/i;
+const measurementPattern = /((?:\d+(?:\.\d+)?\s*(?:x|×)\s*)*\d+(?:\.\d+)?)\s*(mm|cm|mL|ml|%)/i;
 
 export function validateMeasurement(facts: Fact[], report: Report): Warning[] {
   const warnings: Warning[] = [];
@@ -21,8 +21,10 @@ export function validateMeasurement(facts: Fact[], report: Report): Warning[] {
         });
         continue;
       }
-      const sameValue = Number(match[1]) === fact.measurement.value;
-      const sameUnit = match[2].toLowerCase() === fact.measurement.unit.toLowerCase();
+       const values = match[1].split(/\s*(?:x|×)\s*/i).map(Number);
+       const expectedValues = fact.measurement.values ?? [fact.measurement.value];
+       const sameValue = values.length === expectedValues.length && values.every((value, index) => value === expectedValues[index]);
+       const sameUnit = match[2].toLowerCase() === fact.measurement.unit.toLowerCase();
       if (!sameValue || !sameUnit) {
         warnings.push({
           id: `measurement-mismatch-${sentence.id}-${fact.id}`,
@@ -32,6 +34,8 @@ export function validateMeasurement(facts: Fact[], report: Report): Warning[] {
           severity: "high",
           fix: `Use the documented measurement: ${fact.measurement.raw}.`,
           factIds: [fact.id],
+            sentenceId: sentence.id,
+            status: "open",
         });
       }
     }

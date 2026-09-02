@@ -18,6 +18,8 @@ export function validateNegation(facts: Fact[], report: Report): Warning[] {
         severity: "high",
         fix: fact.negated ? "Restore the documented negation." : "Remove the negation so the positive finding is preserved.",
         factIds: [fact.id],
+        sentenceId: sentence.id,
+        status: "open",
       });
     }
   }
