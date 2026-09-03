@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight, Check, ChevronDown, CircleHelp, FileText, Info, LoaderCircle, LockKeyhole, Play, RotateCcw, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "../components/ui/button";
+import { applyDeterministicFix, canAutoFix } from "../lib/radiology/correction";
 import { EXAMPLE_CASES } from "../lib/radiology/examples";
+import { validateReport } from "../lib/radiology/validation";
 import type { Fact, Provenance, ReportSentence, Warning, WorkflowResult } from "../lib/radiology/types";
 
 export const Route = createFileRoute("/")({
@@ -67,7 +69,7 @@ function WarningRow({ warning, onDismiss, onFix }: { warning: Warning; onDismiss
         </div>
         <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-muted-foreground"><Info size={14} className="mt-0.5 shrink-0 text-primary" />{warning.fix}</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={onFix}><Check size={14} />Apply fix</Button>
+          {canAutoFix(warning) && <Button size="sm" variant="secondary" onClick={onFix}><Check size={14} />Apply fix</Button>}
           <Button size="sm" variant="ghost" onClick={onDismiss}><X size={14} />Dismiss</Button>
         </div>
       </div>
@@ -83,11 +85,12 @@ function Index() {
   const [dictation, setDictation] = useState(initialDictation);
   const [selectedCase, setSelectedCase] = useState(EXAMPLE_CASES[0]?.id ?? "");
   const [result, setResult] = useState<WorkflowResult | null>(null);
-  const [dismissedWarnings, setDismissedWarnings] = useState<string[]>([]);
+  const [auditWarnings, setAuditWarnings] = useState<Warning[]>([]);
+  const [correctionNotice, setCorrectionNotice] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
 
-  const visibleWarnings = useMemo(() => result?.warnings.filter((warning) => !dismissedWarnings.includes(warning.id)) ?? [], [dismissedWarnings, result]);
+  const visibleWarnings = useMemo(() => result?.warnings.filter((warning) => warning.status === "open") ?? [], [result]);
 
   function loadExample(id: string) {
     const example = EXAMPLE_CASES.find((item) => item.id === id);
@@ -96,7 +99,8 @@ function Index() {
     setDictation(example.dictation);
     setResult(null);
     setError("");
-    setDismissedWarnings([]);
+    setAuditWarnings([]);
+    setCorrectionNotice("");
   }
 
   async function generateReport() {
@@ -106,7 +110,8 @@ function Index() {
     }
     setIsGenerating(true);
     setError("");
-    setDismissedWarnings([]);
+    setAuditWarnings([]);
+    setCorrectionNotice("");
     try {
       const response = await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dictation }) });
       const body = (await response.json()) as WorkflowResult | { error?: string };
@@ -119,10 +124,33 @@ function Index() {
     }
   }
 
+  function dismissWarning(warning: Warning) {
+    const dismissed = { ...warning, status: "dismissed" as const };
+    setAuditWarnings((current) => [...current.filter((item) => item.id !== warning.id), dismissed]);
+    setResult((current) => current ? { ...current, warnings: current.warnings.map((item) => item.id === warning.id ? dismissed : item) } : current);
+    setCorrectionNotice("Warning dismissed for human review.");
+  }
+
   function applyFix(warning: Warning) {
-    setDismissedWarnings((current) => [...current, warning.id]);
     if (!result) return;
-    setResult({ ...result, warnings: result.warnings.filter((item) => item.id !== warning.id) });
+    const correction = applyDeterministicFix(result.facts, result.report, warning);
+    if (!correction.changed) {
+      setCorrectionNotice(correction.description);
+      return;
+    }
+
+    const revalidatedWarnings = validateReport(result.facts, correction.report);
+    const unresolved = revalidatedWarnings.some((item) => item.id === warning.id);
+    if (unresolved) {
+      setResult({ ...result, report: correction.report, warnings: revalidatedWarnings });
+      setCorrectionNotice(`${correction.description} The warning remains open after revalidation.`);
+      return;
+    }
+
+    const fixed = { ...warning, status: "fixed" as const };
+    setAuditWarnings((current) => [...current.filter((item) => item.id !== warning.id), fixed]);
+    setResult({ ...result, report: correction.report, warnings: revalidatedWarnings });
+    setCorrectionNotice(`${correction.description} Corrected and revalidated.`);
   }
 
   return <div className="min-h-screen bg-background">
@@ -156,7 +184,9 @@ function Index() {
 
       <section className="mt-7 border border-border bg-surface">
         <div className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center"><div><div className="flex items-center gap-2"><span className="flex size-6 items-center justify-center rounded bg-warning-soft text-warning-foreground"><span className="text-xs font-bold">04</span></span><h2 className="font-display text-lg font-bold">Safety review</h2></div><p className="mt-1 pl-8 text-xs text-muted-foreground">Deterministic checks run against the structured facts.</p></div>{result && <div className={`flex items-center gap-2 text-xs font-bold ${visibleWarnings.length ? "text-warning-foreground" : "text-success"}`}><span className={`flex size-6 items-center justify-center rounded-full ${visibleWarnings.length ? "bg-warning" : "bg-success"} text-primary-foreground`}>{visibleWarnings.length ? <AlertTriangle size={13} /> : <Check size={13} />}</span>{visibleWarnings.length ? `${visibleWarnings.length} review ${visibleWarnings.length === 1 ? "item" : "items"}` : "No consistency issues found"}</div>}</div>
-        {result && visibleWarnings.length > 0 ? <div>{visibleWarnings.map((warning) => <WarningRow key={warning.id} warning={warning} onDismiss={() => setDismissedWarnings((current) => [...current, warning.id])} onFix={() => applyFix(warning)} />)}</div> : result ? <div className="flex flex-col items-center justify-center px-6 py-12 text-center"><div className="mb-3 flex size-11 items-center justify-center rounded-full bg-success-soft text-success"><ShieldCheck size={21} /></div><p className="font-semibold text-foreground">Report is ready for human review</p><p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">All checked content is consistent with the extracted facts. Confirm the report against the original dictation before sign-off.</p><Button variant="secondary" size="sm" className="mt-5" onClick={() => { setResult(null); setDismissedWarnings([]); }}><RotateCcw size={14} />Start another report</Button></div> : <EmptyState title="Validation waits for a report" detail="Laterality, negation, measurements, grounding, and completeness will be checked here." />}
+         {correctionNotice && <p role="status" className="border-b border-border bg-success-soft px-5 py-3 text-sm font-semibold text-success">{correctionNotice}</p>}
+         {result && visibleWarnings.length > 0 ? <div>{visibleWarnings.map((warning) => <WarningRow key={warning.id} warning={warning} onDismiss={() => dismissWarning(warning)} onFix={() => applyFix(warning)} />)}</div> : result ? <div className="flex flex-col items-center justify-center px-6 py-12 text-center"><div className="mb-3 flex size-11 items-center justify-center rounded-full bg-success-soft text-success"><ShieldCheck size={21} /></div><p className="font-semibold text-foreground">Report is ready for human review</p><p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">All checked content is consistent with the extracted facts. Confirm the report against the original dictation before sign-off.</p><Button variant="secondary" size="sm" className="mt-5" onClick={() => { setResult(null); setAuditWarnings([]); setCorrectionNotice(""); }}><RotateCcw size={14} />Start another report</Button></div> : <EmptyState title="Validation waits for a report" detail="Laterality, negation, measurements, grounding, and completeness will be checked here." />}
+         {auditWarnings.length > 0 && <div className="border-t border-border px-5 py-4"><h3 className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">Review history</h3><div className="grid gap-2 sm:grid-cols-2">{auditWarnings.map((warning) => <div key={`${warning.id}-${warning.status}`} className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-muted px-3 py-2 text-xs"><span className="min-w-0 truncate text-foreground">{warning.type}</span><span className={`shrink-0 rounded-full px-2 py-0.5 font-bold uppercase tracking-wider ${warning.status === "fixed" ? "bg-success-soft text-success" : "bg-secondary text-muted-foreground"}`}>{warning.status}</span></div>)}</div></div>}
       </section>
       <footer className="mt-6 flex items-start gap-2 px-1 text-xs leading-5 text-muted-foreground"><Info size={14} className="mt-0.5 shrink-0" />Bionic Flow reduces hallucination risk through constrained generation and deterministic validation. It does not replace clinical judgment or the final human sign-off.</footer>
     </main>

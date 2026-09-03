@@ -19,7 +19,7 @@ const ENTITY_PATTERNS = [
   { pattern: /heart size/i, entity: "heart size", anatomy: "heart" },
 ];
 
-const MEASUREMENT_PATTERN = /(\d+(?:\.\d+)?)\s*(mm|cm|mL|ml|%)/i;
+const MEASUREMENT_PATTERN = /((?:\d+(?:\.\d+)?\s*(?:x|×)\s*)*\d+(?:\.\d+)?)\s*(mm|cm|mL|ml|%)/i;
 
 function getLaterality(text: string): Laterality {
   const lower = text.toLowerCase();
@@ -64,7 +64,7 @@ export function extractFacts(dictation: string): Fact[] {
     const laterality = getLaterality(sentence);
     const measurement = measurementMatch
       ? {
-          value: Number(measurementMatch[1]),
+          value: Number(measurementMatch[1].split(/\s*(?:x|×)\s*/i)[0]),
           values: measurementMatch[1].split(/\s*(?:x|×)\s*/i).map(Number),
           unit: measurementMatch[2].toLowerCase(),
           raw: measurementMatch[0],
