@@ -149,7 +149,7 @@ function Index() {
 
     const fixed = { ...warning, status: "fixed" as const };
     setAuditWarnings((current) => [...current.filter((item) => item.id !== warning.id), fixed]);
-    setResult({ ...result, report: correction.report, warnings: revalidatedWarnings });
+    setResult({ ...result, report: correction.report, warnings: [...revalidatedWarnings, fixed] });
     setCorrectionNotice(`${correction.description} Corrected and revalidated.`);
   }
 
