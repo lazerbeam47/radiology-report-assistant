@@ -58,8 +58,7 @@ export function extractFacts(dictation: string): Fact[] {
     if (!match || match.index === undefined) continue;
 
     const sentence = sourceSentence(dictation, match.index, match[0].length);
-    const localWindow = dictation.slice(Math.max(0, match.index - 48), Math.min(dictation.length, match.index + match[0].length + 48));
-    const measurementMatch = localWindow.match(MEASUREMENT_PATTERN);
+    const measurementMatch = sentence.match(MEASUREMENT_PATTERN);
     const negated = isNegated(sentence, match[0]);
     const laterality = getLaterality(sentence);
     const measurement = measurementMatch
