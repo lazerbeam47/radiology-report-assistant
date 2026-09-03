@@ -9,7 +9,7 @@ function factPhrase(fact: Fact) {
   const laterality = fact.laterality !== "none" && !fact.anatomy.toLowerCase().includes(fact.laterality)
     ? `${fact.laterality} `
     : "";
-  const measurement = fact.measurement ? ` measuring ${fact.measurement.value} ${fact.measurement.unit}` : "";
+  const measurement = fact.measurement ? ` measuring ${fact.measurement.raw}` : "";
   return `${laterality}${fact.anatomy} ${fact.entity}${measurement}`.replace(/\s+/g, " ").trim();
 }
 

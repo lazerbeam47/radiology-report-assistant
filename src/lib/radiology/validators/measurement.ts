@@ -18,13 +18,15 @@ export function validateMeasurement(facts: Fact[], report: Report): Warning[] {
           severity: "medium",
           fix: `Preserve the documented measurement: ${fact.measurement.raw}.`,
           factIds: [fact.id],
+          sentenceId: sentence.id,
+          status: "open",
         });
         continue;
       }
-       const values = match[1].split(/\s*(?:x|×)\s*/i).map(Number);
-       const expectedValues = fact.measurement.values ?? [fact.measurement.value];
-       const sameValue = values.length === expectedValues.length && values.every((value, index) => value === expectedValues[index]);
-       const sameUnit = match[2].toLowerCase() === fact.measurement.unit.toLowerCase();
+      const values = match[1].split(/\s*(?:x|×)\s*/i).map(Number);
+      const expectedValues = fact.measurement.values;
+      const sameValue = values.length === expectedValues.length && values.every((value, index) => value === expectedValues[index]);
+      const sameUnit = match[2].toLowerCase() === fact.measurement.unit.toLowerCase();
       if (!sameValue || !sameUnit) {
         warnings.push({
           id: `measurement-mismatch-${sentence.id}-${fact.id}`,

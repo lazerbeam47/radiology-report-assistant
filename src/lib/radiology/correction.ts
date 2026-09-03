@@ -74,7 +74,9 @@ export function applyDeterministicFix(facts: Fact[], report: Report, warning: Wa
   if (warning.type === "Measurement mismatch" && fact?.measurement) {
     const result = updateReportSentence(report, warning, (sentence) => ({
       ...sentence,
-      text: sentence.text.replace(measurementPattern, fact.measurement?.raw ?? ""),
+      text: measurementPattern.test(sentence.text)
+        ? sentence.text.replace(measurementPattern, fact.measurement.raw)
+        : sentence.text.replace(/\b(is present|are present|is seen|are seen)\.?$/i, `measuring ${fact.measurement.raw} $1`),
     }));
     return { ...result, description: `Restored the documented measurement “${fact.measurement.raw}”.` };
   }
